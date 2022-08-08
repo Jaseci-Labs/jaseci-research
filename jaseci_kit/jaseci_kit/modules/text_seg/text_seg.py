@@ -3,6 +3,7 @@ from fastapi import HTTPException
 from transformers import AutoTokenizer, AutoModelForSequenceClassification
 import torch
 from jaseci.actions.live_actions import jaseci_action
+from jaseci.utils.utils import logger
 
 # loading segmentation model from hugging face
 tokenizer = AutoTokenizer.from_pretrained("dennlinger/roberta-cls-consec")
@@ -59,8 +60,10 @@ def segmentation(text, threshold=0.85):
 
 @jaseci_action(act_group=["text_seg"], allow_remote=True)
 def get_segments(text: str, threshold: float = 0.7):
+    logger.info("Received request : text_seg.get_segments")
     try:
         segmented_text = segmentation(text=text, threshold=threshold)
+        logger.info("Returning response : text_seg.get_segments")
         return segmented_text
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

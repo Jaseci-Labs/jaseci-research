@@ -2,7 +2,7 @@ import requests
 import os
 import re
 import uuid
-
+from jaseci.utils.utils import logger
 from jaseci.actions.live_actions import jaseci_action
 from PyPDF2 import PdfFileReader
 from fastapi import HTTPException
@@ -66,15 +66,16 @@ def extract_pdf(url: str = None, path: str = None, metadata: bool = False):
     :param filename: filename for the deleting pdf file.
     :param metadata: boolean if you want to display available metadata of PDF.
     """
-
+    logger.info("Received request : pdf_ext.extract_pdf")
     filename = str(uuid.uuid4().hex) + ".pdf"
     data = {"pages": 0, "content": None}
-    if url != None:
+    if url is not None:
         if valid_url(url):
             try:
                 download_pdf(url, filename)
                 data = process_pdf(filename, metadata, data)
                 remove_pdf(filename)
+                logger.info("Returning response : pdf_ext.extract_pdf")
                 return data
             except Exception:
                 remove_pdf(filename)
@@ -85,9 +86,10 @@ def extract_pdf(url: str = None, path: str = None, metadata: bool = False):
         else:
             raise HTTPException(status_code=415, detail=str("Invalid file format"))
 
-    elif path != None:
+    elif path is not None:
         if valid_file_path(path):
             data = process_pdf(path, metadata, data)
+            logger.info("Returning response : pdf_ext.extract_pdf")
             return data
         raise HTTPException(status_code=400, detail=str("Invalid path"))
     else:

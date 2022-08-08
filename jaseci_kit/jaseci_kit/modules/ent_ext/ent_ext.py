@@ -17,6 +17,7 @@ import os
 from pathlib import Path
 from datetime import datetime
 import warnings
+from jaseci.utils.utils import logger
 
 warnings.filterwarnings("ignore")
 
@@ -234,6 +235,7 @@ def entity_detection(text: str, ner_labels: Optional[List] = ["PREDEFINED"]):
     """
     API for detectiing provided entity in text
     """
+    logger.info("Received request : ent_ext.entity_detection")
     global tagger, MODEL_TYPE
     if tagger is not None:
         if text:
@@ -260,6 +262,7 @@ def entity_detection(text: str, ner_labels: Optional[List] = ["PREDEFINED"]):
                     temp_dict["start_pos"] = json_data["start_pos"]
                     temp_dict["end_pos"] = json_data["end_pos"]
                     response_data_format["entities"].append(temp_dict)
+                    logger.info("Returning response : ent_ext.entity_detection")
                 return response_data_format
             else:
                 raise HTTPException(

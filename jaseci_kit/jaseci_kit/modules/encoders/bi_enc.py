@@ -2,14 +2,16 @@ import os
 import torch
 from typing import Dict, List, Union
 from fastapi import HTTPException
-from transformers import AutoModel, AutoConfig, AutoTokenizer
+from transformers import AutoModel, AutoConfig
+from transformers import BertTokenizer as cont_token
+from transformers import BertTokenizer as cand_token
 import traceback
 import numpy as np
 from jaseci.actions.live_actions import jaseci_action
 import random
 import json
 import shutil
-
+from jaseci.utils.utils import logger
 from .utils.evaluate import get_embeddings  # noqa
 from .utils.models import BiEncoder  # noqa
 from .utils.train import train_model  # noqa
@@ -34,7 +36,8 @@ def config_setup():
     Loading configurations from utils/config.cfg and
     initialize tokenizer and model
     """
-    global model, tokenizer, model_config, train_config, t_config_fname, m_config_fname
+    global model, cont_tokenizer, cand_tokenizer, model_config, train_config
+    global t_config_fname, m_config_fname
     dirname = os.path.dirname(__file__)
     m_config_fname = os.path.join(dirname, "utils/model_config.json")
     t_config_fname = os.path.join(dirname, "utils/train_config.json")
@@ -45,7 +48,10 @@ def config_setup():
 
     train_config.update({"device": device.type})
     trf_config = AutoConfig.from_pretrained(model_config["model_name"])
-    tokenizer = AutoTokenizer.from_pretrained(
+    cont_tokenizer = cont_token.from_pretrained(
+        model_config["model_name"], do_lower_case=True, clean_text=False
+    )
+    cand_tokenizer = cand_token.from_pretrained(
         model_config["model_name"], do_lower_case=True, clean_text=False
     )
     if model_config["shared"] is True:
@@ -82,7 +88,9 @@ def cosine_sim(vec_a: List[float], vec_b: List[float]):
     Return - float between 0 and 1
     """
 
+    logger.info("Received request : bi_enc.cosine_sim")
     result = np.dot(vec_a, vec_b) / (np.linalg.norm(vec_a) * np.linalg.norm(vec_b))
+    logger.info("Returning response : bi_enc.cosine_sim")
     return result.astype(float)
 
 
@@ -94,7 +102,9 @@ def dot_prod(vec_a: List[float], vec_b: List[float]):
     Param 2 - Second vector
     Return - dot product
     """
+    logger.info("Received request : bi_enc.dot_prod")
     dot_product = np.matmul(vec_a, vec_b)
+    logger.info("Returning response : bi_enc.dot_prod")
     return dot_product.astype(float)
 
 
@@ -108,6 +118,7 @@ def infer(
     """
     Take list of context, candidate and return nearest candidate to the context
     """
+    logger.info("Received request : bi_enc.infer")
     model.eval()
     predicted_candidates = []
     try:
@@ -146,6 +157,7 @@ def infer(
                         out_data["candidate"].append(cand)
                         out_data["score"].append(float(dot_prod(vec_a=data, vec_b=lbl)))
                 predicted_candidates.append(out_data)
+        logger.info("Returning response : bi_enc.infer")
         return predicted_candidates
     except Exception as e:
         raise HTTPException(
@@ -183,7 +195,7 @@ def train(dataset: Dict = None, from_scratch=False, training_parameters: Dict = 
                 train_data["labels"].append(1)
         model = train_model(
             model=model,
-            tokenizer=tokenizer,
+            tokenizer=cand_tokenizer,
             contexts=train_data["contexts"],
             candidates=train_data["candidates"],
             labels=train_data["labels"],
@@ -201,18 +213,20 @@ def get_context_emb(contexts: List):
     """
     Take list of context and returns the embeddings
     """
+    logger.info("Received request : bi_enc.encode_context")
     model.eval()
     embedding = []
     for cont in contexts:
         embedding.append(
             get_embeddings(
                 model=model,
-                tokenizer=tokenizer,
+                tokenizer=cont_tokenizer,
                 text_data=cont,
                 embed_type="context",
                 train_config=train_config,
             )
         )
+    logger.info("Returning response : bi_enc.encode_context")
     return embedding
 
 
@@ -224,14 +238,16 @@ def get_candidate_emb(candidates: List):
     """
     Take list of candidates and returns the embeddings
     """
+    logger.info("Received request : bi_enc.encode_candidate")
     model.eval()
     embedding = get_embeddings(
         model,
-        tokenizer,
+        cand_tokenizer,
         text_data=candidates,
         embed_type="candidate",
         train_config=train_config,
     )
+    logger.info("Returning response : bi_enc.encode_candidate")
     return embedding
 
 
@@ -301,7 +317,7 @@ def save_model(model_path: str):
             os.makedirs(model_path)
         if model_config["shared"] is True:
             model.cont_bert.save_pretrained(model_path)
-            tokenizer.save_vocabulary(model_path)
+            cont_tokenizer.save_vocabulary(model_path)
             print(f"Saving shared model to : {model_path}")
         else:
             cand_bert_path = os.path.join(model_path + "/cand_bert")
@@ -310,8 +326,8 @@ def save_model(model_path: str):
                 os.makedirs(cand_bert_path)
             if not os.path.exists(cont_bert_path):
                 os.makedirs(cont_bert_path)
-            tokenizer.save_vocabulary(cand_bert_path)
-            tokenizer.save_vocabulary(cont_bert_path)
+            cont_tokenizer.save_vocabulary(cand_bert_path)
+            cont_tokenizer.save_vocabulary(cont_bert_path)
             model.cont_bert.save_pretrained(cont_bert_path)
             model.cand_bert.save_pretrained(cand_bert_path)
             print(f"Saving non-shared model to : {model_path}")
@@ -334,7 +350,7 @@ def load_model(model_path):
     """
     loads the model from the provided model_path
     """
-    global model, tokenizer
+    global model, cont_tokenizer, cand_tokenizer
     if not os.path.exists(model_path):
         raise HTTPException(status_code=404, detail="Model path is not available")
     try:
@@ -342,7 +358,10 @@ def load_model(model_path):
             model_config_data = json.load(jsonfile)
         if model_config_data["shared"] is True:
             trf_config = AutoConfig.from_pretrained(model_path, local_files_only=True)
-            tokenizer = AutoTokenizer.from_pretrained(
+            cont_tokenizer = cont_token.from_pretrained(
+                model_path, do_lower_case=True, clean_text=False
+            )
+            cand_tokenizer = cand_token.from_pretrained(
                 model_path, do_lower_case=True, clean_text=False
             )
             cont_bert = AutoModel.from_pretrained(model_path, local_files_only=True)
@@ -357,8 +376,11 @@ def load_model(model_path):
             trf_config = AutoConfig.from_pretrained(
                 cont_bert_path, local_files_only=True
             )
-            tokenizer = AutoTokenizer.from_pretrained(
-                cand_bert_path, do_lower_case=True, clean_text=False
+            cont_tokenizer = cont_token.from_pretrained(
+                model_path, do_lower_case=True, clean_text=False
+            )
+            cand_tokenizer = cand_token.from_pretrained(
+                model_path, do_lower_case=True, clean_text=False
             )
         model = BiEncoder(
             config=trf_config,

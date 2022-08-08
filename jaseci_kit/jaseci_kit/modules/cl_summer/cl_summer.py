@@ -9,6 +9,7 @@ from sumy.parsers.html import HtmlParser
 from sumy.nlp.stemmers import Stemmer
 from sumy.utils import get_stop_words
 import nltk
+from jaseci.utils.utils import logger
 
 nltk.download("punkt")
 nltk.download("stopwords")
@@ -24,7 +25,7 @@ def summarize(
     sent_count: int = 1,
     summarizer_type: str = "LsaSummarizer",
 ):
-
+    logger.info("Received request : cl_summer.summarize")
     LANGUAGE = "english"
 
     # checking which summarization models to use
@@ -70,7 +71,7 @@ def summarize(
 
     for sentence in summarizer(parser.document, sent_count):
         sentences.append(str(sentence))
-
+    logger.info("Returning response : cl_summer.summarize")
     return sentences
 
 

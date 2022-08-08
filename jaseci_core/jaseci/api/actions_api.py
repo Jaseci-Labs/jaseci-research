@@ -90,3 +90,11 @@ class actions_api:
     # def actions_delete(self, name: str, value: str):
     #     """
     #     """
+    @interface.admin_api()
+    def actions_reset(self):
+        """
+        Reset all live jaseci actions
+        """
+        self.config_set(
+            "ACTIONS_SET", json.dumps({"local": [], "remote": [], "module": []})
+        )

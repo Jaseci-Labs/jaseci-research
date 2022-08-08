@@ -24,6 +24,7 @@ def get_inference(model, tokenizer, contexts, candidates, train_config):
         batch_size=train_config["eval_batch_size"],
         collate_fn=test_data.batchify_join_str,
         shuffle=False,
+        num_workers=0,
     )
     results = []
     for step, batch in enumerate(val_dataloader, start=1):

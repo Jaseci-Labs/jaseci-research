@@ -15,6 +15,7 @@ from .train import (
     check_labels_ok,
 )
 from .entity_utils import create_data, create_data_new
+from jaseci.utils.utils import logger
 
 warnings.filterwarnings("ignore")
 
@@ -77,8 +78,10 @@ def create_train_data(dataset, fname):
 
 @jaseci_action(act_group=["tfm_ner"], allow_remote=True)
 def extract_entity(text: str = None):
+    logger.info("Received request : tfm_ner.extract_entity")
     try:
         data = predict_text(text)
+        logger.info("Returning response : tfm_ner.extract_entity")
         return data
     except Exception as e:
         print(traceback.format_exc())
