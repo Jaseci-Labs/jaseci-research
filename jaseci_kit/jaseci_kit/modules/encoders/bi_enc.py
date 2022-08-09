@@ -326,7 +326,7 @@ def save_model(model_path: str):
                 os.makedirs(cand_bert_path)
             if not os.path.exists(cont_bert_path):
                 os.makedirs(cont_bert_path)
-            cont_tokenizer.save_vocabulary(cand_bert_path)
+            cand_tokenizer.save_vocabulary(cand_bert_path)
             cont_tokenizer.save_vocabulary(cont_bert_path)
             model.cont_bert.save_pretrained(cont_bert_path)
             model.cand_bert.save_pretrained(cand_bert_path)
